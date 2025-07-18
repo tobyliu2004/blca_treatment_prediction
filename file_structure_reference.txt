@@ -1,0 +1,61 @@
+BLADDER PROJECT FILE STRUCTURE REFERENCE
+========================================
+Last updated: 2025-01-12
+
+ROOT DIRECTORY: /Users/tobyliu/bladder/
+
+RAW DATA FILES:
+- BLCA_expression
+- BLCA_methylation
+- BLCA_mutation
+- BLCA_protein_expression
+- BLCA_phenotype
+
+PROCESSED DATA FILES:
+- all_treatment_outcomes.csv (renamed from treatment_outcomes.csv)
+- all_sample_presence_matrix.csv (renamed from sample_presence_matrix.csv)
+- common_samples.txt
+- train_samples_fixed.csv
+- test_samples_fixed.csv
+- treatment_response_fixed.csv
+
+PREPROCESSED DATA DIRECTORY: /Users/tobyliu/bladder/preprocessed_data/
+├── expression/
+│   ├── expression_train_preprocessed.csv
+│   ├── expression_test_preprocessed.csv
+│   └── expression_preprocessing_params.pkl
+├── methylation/
+│   ├── methylation_train_preprocessed.csv
+│   ├── methylation_test_preprocessed.csv
+│   └── methylation_preprocessing_params.pkl
+├── mutation/
+│   ├── mutation_train_preprocessed.csv (3% threshold only)
+│   ├── mutation_test_preprocessed.csv
+│   └── mutation_preprocessing_params.pkl
+├── protein/
+│   ├── protein_train_preprocessed.csv
+│   ├── protein_test_preprocessed.csv
+│   └── protein_preprocessing_params.pkl
+└── preprocessing_summary_partial.pkl
+
+SCRIPTS:
+- step1_map_treatment_outcomes.py
+- step2_find_common_samples.py
+- step3_create_train_test_split.py
+- step4_preprocess_other_datasets.py (expression, mutation, protein)
+- step4_preprocess_methylation.py (methylation only)
+
+FEATURE COUNTS AFTER PREPROCESSING:
+- Expression: 15,710 features
+- Methylation: 207,567 features
+- Mutation: 1,708 features (3% threshold)
+- Protein: 195 features
+
+SAMPLE COUNTS:
+- Training: 227 samples
+- Test: 57 samples
+- Total: 284 samples
+
+CLASS DISTRIBUTION:
+- Training: 159 responders (70.0%), 68 non-responders (30.0%)
+- Test: 40 responders (70.2%), 17 non-responders (29.8%)
