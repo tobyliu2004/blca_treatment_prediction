@@ -19,12 +19,10 @@ from sklearn.neural_network import MLPClassifier
 from sklearn.metrics import roc_auc_score
 from sklearn.calibration import CalibratedClassifierCV
 import xgboost as xgb
-# Removed CatBoost and LightGBM - redundant with XGBoost
 from scipy.optimize import differential_evolution
 import warnings
 warnings.filterwarnings('ignore')
 import os
-# Removed defaultdict - using regular dict
 import json
 from scipy.stats import fisher_exact, rankdata
 import time
@@ -128,7 +126,7 @@ def stable_feature_selection(X_train_fold, y_train_fold, modality, n_features, n
     # If too few stable features, take the most frequent ones
     if len(stable_features) < n_features // 2:
         sorted_features = sorted(feature_counts.items(), key=lambda x: x[1], reverse=True)
-        stable_features = [feat for feat, _ in sorted_features[:n_features]]
+        stable_features = [feat for feat, _ in sorted_features[:min(n_features, len(sorted_features))]]
     
     return stable_features[:n_features]
 
@@ -146,46 +144,53 @@ def train_enhanced_models(X_train, y_train, X_val, y_val, class_weights, modalit
     X_val_scaled = scaler.transform(X_val)
     
     # 1. XGBoost
+    # Hyperparameters tailored by modality dimensionality:
+    # - High-dim (expression/methylation): fewer trees, shallow depth, high regularization
+    # - Low-dim (protein/mutation): more trees, deeper trees, moderate regularization
     xgb_model = xgb.XGBClassifier(
-        n_estimators=100 if modality in ['protein', 'mutation'] else 50,
-        max_depth=5 if modality in ['protein', 'mutation'] else 3,
-        learning_rate=0.1,
-        reg_alpha=1.0 if modality in ['protein', 'mutation'] else 2.0,
-        reg_lambda=2.0 if modality in ['protein', 'mutation'] else 3.0,
-        scale_pos_weight=scale_pos_weight,
+        n_estimators=100 if modality in ['protein', 'mutation'] else 50,  # More trees for smaller feature spaces
+        max_depth=5 if modality in ['protein', 'mutation'] else 3,        # Deeper trees when fewer features
+        learning_rate=0.1,                                                # Standard learning rate
+        reg_alpha=1.0 if modality in ['protein', 'mutation'] else 2.0,    # L1 regularization (higher for high-dim)
+        reg_lambda=2.0 if modality in ['protein', 'mutation'] else 3.0,   # L2 regularization (higher for high-dim)
+        scale_pos_weight=scale_pos_weight,                                # Handle class imbalance
         random_state=42
     )
     xgb_model.fit(X_train_scaled, y_train)
     predictions['xgboost'] = xgb_model.predict_proba(X_val_scaled)[:, 1]
     
     # 2. Random Forest
+    # Less prone to overfitting than XGBoost, good for capturing non-linear patterns
     rf = RandomForestClassifier(
-        n_estimators=100,
-        max_depth=7 if modality in ['protein', 'mutation'] else 5,
-        max_features='sqrt',
-        min_samples_leaf=5,
-        class_weight=class_weights,
+        n_estimators=100,                                              # Standard forest size
+        max_depth=7 if modality in ['protein', 'mutation'] else 5,    # Slightly deeper than XGBoost
+        max_features='sqrt',                                           # Random subspace sampling
+        min_samples_leaf=5,                                            # Prevent overfitting to outliers
+        class_weight=class_weights,                                    # Handle class imbalance
         random_state=42
     )
     rf.fit(X_train_scaled, y_train)
     predictions['random_forest'] = rf.predict_proba(X_val_scaled)[:, 1]
     
     # 3. Logistic Regression
+    # Choose regularization based on feature count to prevent overfitting
     if X_train.shape[1] > 50:
+        # ElasticNet for high-dimensional data (combines L1 and L2)
         lr = LogisticRegression(
             penalty='elasticnet',
-            solver='saga',
-            l1_ratio=0.5,
-            C=0.1,
+            solver='saga',              # Only solver supporting elasticnet
+            l1_ratio=0.5,              # Equal mix of L1 and L2
+            C=0.1,                     # Strong regularization (inverse of strength)
             class_weight=class_weights,
             max_iter=1000,
             random_state=42
         )
     else:
+        # L2 only for low-dimensional data
         lr = LogisticRegression(
             penalty='l2',
-            solver='lbfgs',
-            C=0.1,
+            solver='lbfgs',            # Efficient for small datasets
+            C=0.1,                     # Strong regularization
             class_weight=class_weights,
             max_iter=1000,
             random_state=42
@@ -193,16 +198,17 @@ def train_enhanced_models(X_train, y_train, X_val, y_val, class_weights, modalit
     lr.fit(X_train_scaled, y_train)
     predictions['logistic'] = lr.predict_proba(X_val_scaled)[:, 1]
     
-    # 4. MLP
+    # 4. MLP (Multi-Layer Perceptron)
+    # Neural network to capture non-linear interactions between features
     hidden_layer_sizes = (50,) if X_train.shape[1] < 1000 else (100, 50)
     mlp = MLPClassifier(
-        hidden_layer_sizes=hidden_layer_sizes,
-        activation='relu',
-        alpha=0.01,
-        learning_rate_init=0.001,
+        hidden_layer_sizes=hidden_layer_sizes,  # Smaller network for smaller feature space
+        activation='relu',                       # Standard non-linearity
+        alpha=0.01,                             # L2 regularization strength
+        learning_rate_init=0.001,               # Initial learning rate
         max_iter=1000,
-        early_stopping=True,
-        validation_fraction=0.2,
+        early_stopping=True,                    # Stop when validation score stops improving
+        validation_fraction=0.2,                # 20% of training data for early stopping
         random_state=42
     )
     mlp.fit(X_train_scaled, y_train)
@@ -279,11 +285,12 @@ def cross_validate_focused(modalities_data, y_train, sample_ids, class_weights, 
     # Smart incremental search based on insights
     configs = []
     
-    # Define ranges
-    expr_range = [100, 250, 500, 750, 1000, 1250, 1500, 1750, 2000]
-    meth_range = [3000, 4000, 5000, 6000, 7000, 8000, 10000, 12000, 15000]
-    prot_range = [25, 50, 75, 100, 125, 150, 175]  # 25 increments
-    mut_range = [50, 100, 150, 200, 250, 300, 350, 400, 450, 500]  # 50 increments
+    # Grid search ranges optimized based on prior experiments
+    # Testing order prioritizes promising configurations for early stopping
+    expr_range = [1000, 1250, 1500, 1750, 2000, 750, 500, 250, 100]  # 1000-2000 performed best
+    meth_range = [5000, 6000, 7000, 8000, 4000, 10000, 3000, 12000, 15000]  # 5000-8000 optimal
+    prot_range = [100, 125, 150, 175, 75, 50, 25]  # All features (185) often best, testing subsets
+    mut_range = [200, 250, 300, 150, 350, 400, 100, 450, 500, 50]  # 200-300 features optimal
     
     # Generate all combinations
     config_count = 0
@@ -352,9 +359,15 @@ def cross_validate_focused(modalities_data, y_train, sample_ids, class_weights, 
                 X_train_fold = modalities_data[modality].iloc[train_idx]
                 X_val_fold = modalities_data[modality].iloc[val_idx]
                 
-                # Stable feature selection
+                # Stable feature selection with adaptive iterations
+                # Use fewer iterations for very small feature selections from large spaces
+                if n_features < 500 and X_train_fold.shape[1] > 10000:
+                    n_iter = 3  # Faster for extreme selections
+                else:
+                    n_iter = 5  # Standard for normal cases
+                
                 selected_features = stable_feature_selection(
-                    X_train_fold, y_train_fold, modality, n_features, n_iterations=5
+                    X_train_fold, y_train_fold, modality, n_features, n_iterations=n_iter
                 )
                 
                 if len(selected_features) < 10:

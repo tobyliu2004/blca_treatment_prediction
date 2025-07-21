@@ -130,6 +130,10 @@ def create_modality_fusion_comparison():
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
     
+    # Add figure caption
+    plt.figtext(0.5, -0.05, 'Figure 1. Individual modality performance vs multimodal fusion. Late fusion combining all four modalities achieves 0.712 AUC,\nsignificantly outperforming the best individual modality (protein, 0.662 AUC). Error bars represent standard deviation across 5-fold CV.',
+                ha='center', fontsize=10, wrap=True, style='italic')
+    
     plt.tight_layout()
     plt.savefig(f'{output_dir}/01_modality_fusion_comparison.png', dpi=300, bbox_inches='tight')
     plt.savefig(f'{output_dir}/01_modality_fusion_comparison.pdf', bbox_inches='tight')
@@ -216,6 +220,10 @@ def create_fusion_configuration_comparison():
     # Remove top and right spines
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
+    
+    # Add figure caption
+    plt.figtext(0.5, -0.05, 'Figure 2. Performance comparison of different feature configurations. Grid search identified optimal feature counts\n(1,500 expression, 5,500 methylation) achieving 0.712 AUC. Higher feature counts showed diminishing returns.',
+                ha='center', fontsize=10, wrap=True, style='italic')
     
     plt.tight_layout()
     plt.savefig(f'{output_dir}/02_fusion_configuration_comparison.png', dpi=300, bbox_inches='tight')
@@ -345,6 +353,10 @@ def create_preprocessing_funnel():
     fig.suptitle('Dramatic Feature Reduction Across All Modalities', 
                  fontsize=18, fontweight='bold', color=COLORS['primary'])
     
+    # Add figure caption
+    plt.figtext(0.5, -0.02, 'Figure 3. Feature reduction through preprocessing pipeline. Starting from >495K features across all modalities,\nsystematic filtering reduced to ~59K features while preserving predictive signal. Final feature selection performed within CV folds.',
+                ha='center', fontsize=10, wrap=True, style='italic')
+    
     plt.tight_layout()
     plt.savefig(f'{output_dir}/03_preprocessing_funnel.png', dpi=300, bbox_inches='tight')
     plt.savefig(f'{output_dir}/03_preprocessing_funnel.pdf', bbox_inches='tight')
@@ -454,6 +466,10 @@ def create_expression_comparison():
             fontsize=10, style='italic',
             color=COLORS['secondary'],
             transform=ax.transAxes)
+    
+    # Add figure caption
+    plt.figtext(0.5, -0.05, 'Figure 4. Comparison of gene expression representations. Standard preprocessing with fold change selection (0.646 AUC)\noutperformed computationally intensive autoencoder embeddings (0.522 AUC), demonstrating that domain knowledge trumps complexity.',
+                ha='center', fontsize=10, wrap=True, style='italic')
     
     plt.tight_layout()
     plt.savefig(f'{output_dir}/04_expression_comparison.png', dpi=300, bbox_inches='tight')
@@ -684,6 +700,10 @@ def create_model_performance_heatmap():
                 'Note: Multimodal fusion (0.705 AUC) outperforms all individual modality-model combinations',
                 ha='center', fontsize=11, style='italic', color=COLORS['secondary'])
     
+    # Add figure caption
+    plt.figtext(0.5, -0.05, 'Figure 6. Model performance heatmap across modalities. XGBoost consistently performs best (highlighted boxes).\nProtein expression achieves highest individual modality performance (0.662 AUC with XGBoost).',
+                ha='center', fontsize=10, wrap=True, style='italic')
+    
     plt.tight_layout()
     plt.savefig(f'{output_dir}/06_model_performance_heatmap.png', dpi=300, bbox_inches='tight')
     plt.savefig(f'{output_dir}/06_model_performance_heatmap.pdf', bbox_inches='tight')
@@ -838,6 +858,10 @@ def create_mutation_pathway_network():
     ax.text(0.5, 0.93, 'Biologically meaningful grouping reduces dimensionality while preserving signal',
             transform=ax.transAxes, ha='center', fontsize=12,
             style='italic', color=COLORS['secondary'])
+    
+    # Add figure caption
+    plt.figtext(0.5, -0.05, 'Figure 7. Mutation pathway aggregation network. Individual gene mutations are grouped into functional pathways\n(e.g., RTK-RAS, PI3K-AKT) to reduce dimensionality from 1,725 to 5 pathway features while preserving biological signal.',
+                ha='center', fontsize=10, wrap=True, style='italic')
     
     plt.tight_layout()
     plt.savefig(f'{output_dir}/07_mutation_pathway_network.png', dpi=300, bbox_inches='tight')

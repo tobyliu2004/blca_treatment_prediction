@@ -10,7 +10,7 @@ Goal: Extensively test feature selection methods and model combinations
 - Feature selection happens inside each fold using only training data
 - Tests multiple feature counts per modality based on actual preprocessed data sizes
 - Includes t-test and mutual information feature selection
-- Tests more models including re-enabled CatBoost, LightGBM, and GradientBoosting
+- Tests more models including LightGBM and GradientBoosting
 
 Models:
 1. Logistic Regression (baseline)
@@ -18,10 +18,9 @@ Models:
 3. XGBoost  
 4. SVM
 5. Multi-Layer Perceptron (MLP) - 3 architectures
-6. CatBoost
-7. LightGBM
-8. Gradient Boosting
-9. ElasticNet
+6. LightGBM
+7. Gradient Boosting
+8. ElasticNet
 """
 
 import pandas as pd
@@ -37,7 +36,6 @@ from sklearn.metrics import roc_auc_score, accuracy_score, precision_score, reca
 from scipy import stats
 from scipy.stats import fisher_exact
 import xgboost as xgb
-from catboost import CatBoostClassifier
 import lightgbm as lgb
 import torch
 import torch.nn as nn
@@ -390,15 +388,7 @@ def train_all_models(X_train, y_train, X_val, y_val, class_weights):
     results['xgboost'] = xgb_model.predict_proba(X_val)[:, 1]
     models['xgboost'] = xgb_model
     
-    # 4. CatBoost
-    cb = CatBoostClassifier(iterations=100, learning_rate=0.1, depth=6,
-                           class_weights=list(class_weights.values()),
-                           random_state=42, verbose=False)
-    cb.fit(X_train, y_train)
-    results['catboost'] = cb.predict_proba(X_val)[:, 1]
-    models['catboost'] = cb
-    
-    # 5. LightGBM
+    # 4. LightGBM
     lgb_model = lgb.LGBMClassifier(n_estimators=100, num_leaves=31,
                                    scale_pos_weight=scale_pos_weight,
                                    random_state=42, verbose=-1)
@@ -723,7 +713,7 @@ def main():
     print("\nThis version tests:")
     print("- Multiple feature selection methods including t-test")
     print("- Many more feature count configurations")
-    print("- 9 different models including CatBoost, LightGBM, etc.")
+    print("- 8 different models including LightGBM, XGBoost, etc.")
     print("- 3 different MLP architectures")
     print(f"\nStarted at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     
