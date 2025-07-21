@@ -224,7 +224,7 @@ def train_optimized_models(X_train, y_train, X_val, y_val, class_weights, modali
 # 1. Simple average of predictions
 # 2. Weighted average based on performance of each modality
 # record which fusion method works best
-def cross_validate_optimized(modalities_data, y_train, sample_ids, class_weights, n_folds=5):
+def cross_validate_optimized(modalities_data, y_train, sample_ids, class_weights, configs, n_folds=5):
     """
     Optimized cross-validation testing different configurations.
     """
@@ -233,17 +233,6 @@ def cross_validate_optimized(modalities_data, y_train, sample_ids, class_weights
     print("="*70)
     
     skf = StratifiedKFold(n_splits=n_folds, shuffle=True, random_state=42)
-    
-    # Test configurations
-    configs = [
-        # Config: (n_expr, n_meth, n_prot, n_mut, exclude_modalities)
-        ('standard', 2000, 2000, 150, 200, []),
-        ('high_features', 3000, 3000, 185, 300, []),
-        ('very_high', 4000, 4000, 185, 500, []),
-        ('no_mutation', 3000, 3000, 185, 0, ['mutation']),
-        ('focus_protein', 1000, 1000, 185, 100, []),
-        ('balanced', 2500, 2500, 185, 250, []),
-    ]
     
     results = defaultdict(lambda: defaultdict(list))
     modality_performances = defaultdict(list)
@@ -360,9 +349,23 @@ def main():
         modalities_data[modality] = X_data.loc[sample_ids]
         print(f"  {modality}: {X_data.shape}")
     
+    # Test configurations
+    configs = [
+        # Config: (n_expr, n_meth, n_prot, n_mut, exclude_modalities)
+        ('standard', 2000, 2000, 150, 200, []),
+        ('high_features', 3000, 3000, 185, 300, []),
+        ('very_high', 4000, 4000, 185, 500, []),
+        ('no_mutation', 3000, 3000, 185, 0, ['mutation']),
+        ('focus_protein', 1000, 1000, 185, 100, []),
+        ('balanced', 2500, 2500, 185, 250, []),
+    ]
+    
+    # Number of folds for cross-validation
+    n_folds = 5
+    
     # Run optimized fusion
     fusion_results, modality_performances = cross_validate_optimized(
-        modalities_data, y_train, sample_ids, class_weights
+        modalities_data, y_train, sample_ids, class_weights, configs, n_folds
     )
     
     # Analyze modality stability
@@ -420,6 +423,131 @@ def main():
         print("      - More samples")
         print("      - External validation cohort")
         print("      - Domain-specific feature engineering")
+    
+    # Collect data for additional figures
+    print("\n" + "="*70)
+    print("COLLECTING DATA FOR ADDITIONAL FIGURES")
+    print("="*70)
+    
+    # Re-run best configuration to collect detailed data
+    print(f"\nRe-running best config ({best_config}) to collect detailed data...")
+    
+    # Find best config details
+    best_config_details = None
+    for config_name, n_expr, n_meth, n_prot, n_mut, exclude in configs:
+        if config_name == best_config:
+            best_config_details = (n_expr, n_meth, n_prot, n_mut, exclude)
+            break
+    
+    if best_config_details:
+        n_expr, n_meth, n_prot, n_mut, exclude = best_config_details
+        
+        # Storage for detailed results
+        all_predictions = []
+        all_true_labels = []
+        feature_importances = defaultdict(list)
+        modality_predictions_all = defaultdict(list)
+        
+        # Re-run with best config
+        skf = StratifiedKFold(n_splits=n_folds, shuffle=True, random_state=42)
+        for fold_idx, (train_idx, val_idx) in enumerate(skf.split(modalities_data['expression'], y_train)):
+            print(f"  Processing fold {fold_idx+1}/{n_folds}...")
+            
+            y_train_fold = y_train[train_idx]
+            y_val_fold = y_train[val_idx]
+            
+            if len(np.unique(y_train_fold)) < 2:
+                continue
+            
+            modality_predictions = {}
+            
+            # Process each modality
+            for modality, n_features in [('expression', n_expr), ('methylation', n_meth), 
+                                        ('protein', n_prot), ('mutation', n_mut)]:
+                
+                if modality in exclude or n_features == 0:
+                    continue
+                
+                X_train_fold = modalities_data[modality].iloc[train_idx]
+                X_val_fold = modalities_data[modality].iloc[val_idx]
+                
+                # Select features
+                selected_features = select_features_optimized(
+                    X_train_fold, y_train_fold, modality, n_features
+                )
+                
+                if len(selected_features) < 5:
+                    continue
+                
+                # Store top features
+                feature_importances[modality].append(selected_features[:10])  # Top 10
+                
+                X_train_selected = X_train_fold[selected_features]
+                X_val_selected = X_val_fold[selected_features]
+                
+                # Train models
+                predictions = train_optimized_models(
+                    X_train_selected, y_train_fold,
+                    X_val_selected, y_val_fold,
+                    class_weights, modality
+                )
+                
+                # Use best model
+                best_model = max(predictions.items(), 
+                               key=lambda x: roc_auc_score(y_val_fold, x[1]))
+                modality_predictions[modality] = best_model[1]
+                modality_predictions_all[modality].extend(best_model[1])
+            
+            # Fusion (using best method)
+            if len(modality_predictions) >= 2:
+                if best_method == 'weighted':
+                    # Weighted by performance
+                    weights = {}
+                    for modality, pred in modality_predictions.items():
+                        weights[modality] = roc_auc_score(y_val_fold, pred)
+                    
+                    total_weight = sum(weights.values())
+                    final_pred = np.zeros_like(next(iter(modality_predictions.values())))
+                    for modality, pred in modality_predictions.items():
+                        final_pred += pred * (weights[modality] / total_weight)
+                else:
+                    # Simple average
+                    final_pred = np.mean(list(modality_predictions.values()), axis=0)
+                
+                all_predictions.extend(final_pred)
+                all_true_labels.extend(y_val_fold)
+        
+        # Save detailed results for figure creation
+        detailed_results = {
+            'predictions': np.array(all_predictions),
+            'true_labels': np.array(all_true_labels),
+            'feature_importances': {
+                modality: [feat for fold_feats in feats for feat in fold_feats[:5]]  # Top 5 most common
+                for modality, feats in feature_importances.items()
+            },
+            'modality_predictions': {
+                modality: np.array(preds) 
+                for modality, preds in modality_predictions_all.items()
+            },
+            'best_config': best_config,
+            'best_auc': best_auc
+        }
+        
+        # Save for figure creation
+        with open(f'{output_dir}/figure_data.pkl', 'wb') as f:
+            pickle.dump(detailed_results, f)
+        
+        print("\nData collection complete!")
+        print(f"Saved to: {output_dir}/figure_data.pkl")
+        
+        # Print summary
+        print("\nCollected data summary:")
+        print(f"  Total predictions: {len(all_predictions)}")
+        print(f"  Total true labels: {len(all_true_labels)}")
+        print("\nTop features by modality:")
+        for modality, top_features in detailed_results['feature_importances'].items():
+            if top_features:
+                print(f"  {modality}: {top_features[:5]}")
     
     # Save results
     with open(f'{output_dir}/optimized_results.json', 'w') as f:

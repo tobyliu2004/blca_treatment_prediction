@@ -1313,6 +1313,145 @@ def create_clinical_impact_calculator():
     print("  ✓ Figure 10 saved!")
 
 
+def create_architecture_diagram():
+    """Create ML architecture flow diagram showing the multimodal fusion pipeline."""
+    fig, ax = plt.subplots(figsize=(16, 10), facecolor='white')
+    
+    # Define positions
+    input_y = 0.85
+    feature_y = 0.65
+    model_y = 0.45
+    fusion_y = 0.25
+    output_y = 0.05
+    
+    # Column positions for modalities
+    expr_x, meth_x, prot_x, mut_x = 0.15, 0.35, 0.55, 0.75
+    
+    # 1. Input Data Blocks
+    input_boxes = [
+        (expr_x, input_y, 'Expression\n227 × 20,653', COLORS['modalities']['expression']),
+        (meth_x, input_y, 'Methylation\n227 × 495,000', COLORS['modalities']['methylation']),
+        (prot_x, input_y, 'Protein\n227 × 245', COLORS['modalities']['protein']),
+        (mut_x, input_y, 'Mutation\n227 × 20,530', COLORS['modalities']['mutation'])
+    ]
+    
+    for x, y, text, color in input_boxes:
+        rect = plt.Rectangle((x-0.08, y-0.05), 0.16, 0.08,
+                           facecolor=color, edgecolor='black',
+                           linewidth=2, alpha=0.8)
+        ax.add_patch(rect)
+        ax.text(x, y, text, ha='center', va='center',
+                fontsize=11, fontweight='bold', color='white')
+    
+    # 2. Feature Selection Blocks
+    feature_boxes = [
+        (expr_x, feature_y, 'Fold Change\nTop 3,000', COLORS['modalities']['expression']),
+        (meth_x, feature_y, 'Fold Change\nTop 3,000', COLORS['modalities']['methylation']),
+        (prot_x, feature_y, 'F-statistic\nAll 185', COLORS['modalities']['protein']),
+        (mut_x, feature_y, 'Fisher Test\nTop 300', COLORS['modalities']['mutation'])
+    ]
+    
+    for x, y, text, color in feature_boxes:
+        # Feature selection box with dashed border
+        rect = plt.Rectangle((x-0.08, y-0.05), 0.16, 0.08,
+                           facecolor='white', edgecolor=color,
+                           linewidth=2, linestyle='--')
+        ax.add_patch(rect)
+        ax.text(x, y, text, ha='center', va='center',
+                fontsize=10, color=color, fontweight='bold')
+    
+    # 3. Model Blocks
+    model_text = 'XGBoost\nRandom Forest\nLogistic Reg\nSGD/MLP'
+    model_boxes = [
+        (expr_x, model_y, model_text, COLORS['modalities']['expression']),
+        (meth_x, model_y, model_text, COLORS['modalities']['methylation']),
+        (prot_x, model_y, model_text, COLORS['modalities']['protein']),
+        (mut_x, model_y, model_text, COLORS['modalities']['mutation'])
+    ]
+    
+    for x, y, text, color in model_boxes:
+        rect = plt.Rectangle((x-0.08, y-0.06), 0.16, 0.10,
+                           facecolor=color, edgecolor='black',
+                           linewidth=2, alpha=0.6)
+        ax.add_patch(rect)
+        ax.text(x, y, text, ha='center', va='center',
+                fontsize=9, color='white', fontweight='bold')
+    
+    # 4. Fusion Layer
+    fusion_rect = plt.Rectangle((0.25, fusion_y-0.05), 0.4, 0.08,
+                              facecolor=COLORS['primary'], edgecolor='black',
+                              linewidth=3)
+    ax.add_patch(fusion_rect)
+    ax.text(0.45, fusion_y, 'Performance-Weighted Fusion\nw = [0.256, 0.249, 0.257, 0.234]',
+            ha='center', va='center', fontsize=12, 
+            fontweight='bold', color='white')
+    
+    # 5. Output
+    output_rect = plt.Rectangle((0.35, output_y-0.04), 0.2, 0.06,
+                              facecolor=COLORS['success'], edgecolor='black',
+                              linewidth=3)
+    ax.add_patch(output_rect)
+    ax.text(0.45, output_y, 'Treatment Response\n(0.712 AUC)',
+            ha='center', va='center', fontsize=12,
+            fontweight='bold', color='white')
+    
+    # 6. Arrows connecting layers
+    arrow_props = dict(arrowstyle='->', linewidth=2, color='gray')
+    
+    # Input to Feature Selection
+    for x in [expr_x, meth_x, prot_x, mut_x]:
+        ax.annotate('', xy=(x, feature_y+0.05), xytext=(x, input_y-0.05),
+                    arrowprops=arrow_props)
+    
+    # Feature Selection to Models
+    for x in [expr_x, meth_x, prot_x, mut_x]:
+        ax.annotate('', xy=(x, model_y+0.06), xytext=(x, feature_y-0.05),
+                    arrowprops=arrow_props)
+    
+    # Models to Fusion
+    for x in [expr_x, meth_x, prot_x, mut_x]:
+        target_x = 0.25 + (x-0.15)*0.4  # Converge to fusion box
+        ax.annotate('', xy=(target_x, fusion_y+0.05), xytext=(x, model_y-0.06),
+                    arrowprops=arrow_props)
+    
+    # Fusion to Output
+    ax.annotate('', xy=(0.45, output_y+0.04), xytext=(0.45, fusion_y-0.05),
+                arrowprops=dict(arrowstyle='->', linewidth=3, color='black'))
+    
+    # 7. Add dimension annotations
+    dim_style = dict(fontsize=9, style='italic', color='gray')
+    ax.text(expr_x, input_y-0.08, '↓ 227 × 3,000', ha='center', **dim_style)
+    ax.text(meth_x, input_y-0.08, '↓ 227 × 3,000', ha='center', **dim_style)
+    ax.text(prot_x, input_y-0.08, '↓ 227 × 185', ha='center', **dim_style)
+    ax.text(mut_x, input_y-0.08, '↓ 227 × 300', ha='center', **dim_style)
+    
+    # 8. Add best model indicators
+    best_models = ['XGBoost', 'XGBoost', 'XGBoost', 'XGBoost']
+    for i, (x, best) in enumerate(zip([expr_x, meth_x, prot_x, mut_x], best_models)):
+        ax.text(x+0.09, model_y+0.03, '★', fontsize=14, color='gold',
+                ha='center', va='center')
+    
+    # Title
+    ax.set_title('Multimodal Late Fusion Architecture for Treatment Response Prediction',
+                 fontsize=18, fontweight='bold', pad=20)
+    
+    # Clean up
+    ax.set_xlim(0, 0.9)
+    ax.set_ylim(-0.02, 0.95)
+    ax.axis('off')
+    
+    # Add figure caption
+    plt.figtext(0.5, -0.02, 'Figure 11. Complete ML architecture showing data flow from raw multimodal inputs through feature selection, model training,\nand performance-weighted fusion to final prediction. Stars indicate best-performing model (XGBoost) for each modality.',
+                ha='center', fontsize=10, wrap=True, style='italic')
+    
+    plt.tight_layout()
+    plt.savefig(f'{output_dir}/11_architecture_diagram.png', dpi=300, bbox_inches='tight')
+    plt.savefig(f'{output_dir}/11_architecture_diagram.pdf', bbox_inches='tight')
+    plt.close()
+    
+    print("  ✓ Figure 11 (Architecture Diagram) saved!")
+
+
 # Main execution
 if __name__ == "__main__":
     print("="*60)
@@ -1348,6 +1487,9 @@ if __name__ == "__main__":
     
     # Create Figure 10
     create_clinical_impact_calculator()
+    
+    # Create Figure 11 (Architecture Diagram)
+    create_architecture_diagram()
     
     print("\nAll figures created successfully!")
     print(f"Figures saved to: {output_dir}")

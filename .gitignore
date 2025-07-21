@@ -30,3 +30,21 @@ Thumbs.db
 *.tmp
 *.bak
 *~
+
+# Large data files (>100MB)
+BLCA_expression
+BLCA_methylation
+BLCA_mutations
+BLCA_protien
+
+# Large preprocessed files
+preprocessed_data/methylation/methylation_train_preprocessed.csv
+preprocessed_data/methylation/methylation_preprocessing_params.pkl
+preprocessed_data/expression/expression_train_preprocessed.csv
+
+# Virtual environment
+ml-env/
+
+# Large checkpoint files
+comprehensive_checkpoints/*.pkl
+fusion_optimized_results/*.pkl

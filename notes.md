@@ -173,3 +173,8 @@
 
 
 ok, can you right now create the architecture diagram, than for the other 5, can you add code to step7_fusion_optimized.py to get us the information needed for the other 4 figures? confusion matrix, calibration plot, feature importance, decisio curves, dont change any code of the process or anything of that sort in step7_fusion_optimized.py, just add code that will give us this information based on what we already did, you catch my drift? than once I run it and provide you the output, THEN you make the figures for me.
+
+
+
+
+the LLM scfoundation is a blackbox
