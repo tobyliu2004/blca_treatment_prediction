@@ -1018,11 +1018,6 @@ Perfect! I can see the PCA visualization style you want. Here's exactly what dat
   - Binary predictions (not probabilities): model.predict(X_test)
   - Calculate TP, TN, FP, FN for each model
 
-
-
-what I want you to do is thoroughly go through the two scripts 02_model_training/step6_individual_model_training.py and 03_fusion_approaches/step7_fusion_advanced.py and make sure that at least one of them has the code needed to output the data we need for all figures I just described above to the corresponding output JSON files. I need you to do this thoroughly like a senior ML Engineer whos job depends on getting this right, once I get the green light from you im going to run it and forget about it until tomorrow morning, if I wake up and there was an error that prevented the scripts from running end to finish or the resulting JSON files just simply dont have the data I need fo build these figures and I have to fix and run again and wait another 3 hours before I get my data, I will be very sad, please make the check you do thorough so this doesnt happen, remember, you are a pro.
-
-
 ⏺ 🎉 Success! All PhD-level poster figures have been created!
 
   Here's what was generated in /Users/tobyliu/bladder/04_analysis_viz/final_poster_figures/:

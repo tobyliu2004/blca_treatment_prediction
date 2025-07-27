@@ -1130,9 +1130,20 @@ def convert_numpy_to_native(obj):
     if isinstance(obj, np.integer):
         return int(obj)
     elif isinstance(obj, np.floating):
+        # Handle NaN and Inf values
+        if np.isnan(obj):
+            return None  # Convert NaN to None for JSON compatibility
+        elif np.isinf(obj):
+            return None  # Convert Inf to None for JSON compatibility
         return float(obj)
+    elif isinstance(obj, (float, int)):
+        # Handle Python float/int NaN and Inf
+        if isinstance(obj, float) and (np.isnan(obj) or np.isinf(obj)):
+            return None
+        return obj
     elif isinstance(obj, np.ndarray):
-        return obj.tolist()
+        # Convert to list and recursively handle NaN/Inf in arrays
+        return [convert_numpy_to_native(item) for item in obj]
     elif isinstance(obj, dict):
         return {key: convert_numpy_to_native(value) for key, value in obj.items()}
     elif isinstance(obj, list):

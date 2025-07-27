@@ -1064,11 +1064,22 @@ def main():
     def convert_numpy(obj):
         """Convert numpy types to Python native types for JSON serialization."""
         if isinstance(obj, np.ndarray):
-            return obj.tolist()
+            # Convert to list and recursively handle NaN/Inf in arrays
+            return [convert_numpy(item) for item in obj]
         elif isinstance(obj, (np.int64, np.int32)):
             return int(obj)
         elif isinstance(obj, (np.float64, np.float32)):
+            # Handle NaN and Inf values
+            if np.isnan(obj):
+                return None  # Convert NaN to None for JSON compatibility
+            elif np.isinf(obj):
+                return None  # Convert Inf to None for JSON compatibility
             return float(obj)
+        elif isinstance(obj, float):
+            # Handle Python float NaN and Inf
+            if np.isnan(obj) or np.isinf(obj):
+                return None
+            return obj
         elif isinstance(obj, dict):
             return {k: convert_numpy(v) for k, v in obj.items()}
         elif isinstance(obj, list):
