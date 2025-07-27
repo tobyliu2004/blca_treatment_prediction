@@ -43,7 +43,7 @@ COLORS = {
 }
 
 # Create output directory
-output_dir = '/Users/tobyliu/bladder/poster_figures'
+output_dir = '/Users/tobyliu/bladder/04_analysis_viz/poster_figures'
 os.makedirs(output_dir, exist_ok=True)
 
 def set_figure_style():
