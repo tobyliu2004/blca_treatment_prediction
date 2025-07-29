@@ -1,50 +1,37 @@
+# Large data files
+BLCA_expression
+BLCA_expression_embed.npy
+BLCA_methylation
+BLCA_mutation
+BLCA_phenotype
+BLCA_protein_expression
+preprocessed_data/methylation/methylation_train_preprocessed.csv
+
+# System files
+.DS_Store
+*.DS_Store
+
 # Python
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
-
-# CatBoost
-catboost_info/
-
-# Virtual environments
-venv/
 env/
+venv/
 ENV/
 
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
+# Jupyter Notebook
+.ipynb_checkpoints
 
-# OS
-.DS_Store
-Thumbs.db
+# PDF documents (optional - comment out if you want to include PDFs)
+# *.pdf
 
-# Jupyter
-.ipynb_checkpoints/
+# Large result files (optional - comment out if you want to include)
+# individual_model_results.json
+# pca_visualization_data.pkl
 
 # Temporary files
 *.tmp
-*.bak
-*~
-
-# Large data files (>100MB)
-BLCA_expression
-BLCA_methylation
-BLCA_mutations
-BLCA_protien
-
-# Large preprocessed files
-preprocessed_data/methylation/methylation_train_preprocessed.csv
-preprocessed_data/methylation/methylation_preprocessing_params.pkl
-preprocessed_data/expression/expression_train_preprocessed.csv
-
-# Virtual environment
-ml-env/
-
-# Large checkpoint files
-comprehensive_checkpoints/*.pkl
-fusion_optimized_results/*.pkl
+*.temp
+*.log

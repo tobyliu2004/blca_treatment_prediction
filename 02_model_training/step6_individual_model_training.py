@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 """
 Step 6: OPTIMIZED Model Training with Adaptive Feature Selection
-Author: ML Engineers Team
-Date: 2025-01-21
 
 Goal: Strategic and efficient model training with two-phase adaptive feature selection
 - Phase 1: Broad search across feature counts

@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
 """
 Step 7 ADVANCED: Multi-Modal Fusion Targeting 0.75+ AUC
-Author: Senior ML Engineer & Biology Researcher
-Date: 2025-01-22
 
-Goal: Achieve 0.75+ fusion AUC through advanced valid methods
+Goal: Achieve valid fusion AUC through advanced valid statistical methods
 - NO DATA LEAKAGE (all operations inside CV)
 - Optimized protein features (our strongest signal)
 - Advanced fusion methods (rank, geometric, stacking)
@@ -1175,5 +1173,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-

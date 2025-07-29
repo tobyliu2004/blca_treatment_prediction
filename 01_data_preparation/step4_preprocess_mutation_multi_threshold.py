@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 """
 Step 4: Preprocess mutation data with unsupervised filtering
-Author: ML Engineers Team
-Date: 2025-01-15
 
 Goal: Create mutation features using unsupervised methods:
 - Frequency thresholds (different for known cancer genes)

@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 """
 Step 3: Create 80/20 train-test split with stratification
-Author: ML Engineers Team
-Date: 2025-01-11
 
 Goal: Split the common samples into training and test sets
 - Maintain class balance using stratification

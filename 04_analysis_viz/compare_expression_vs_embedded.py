@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 """
 Compare Expression vs Embedded Expression Performance
-Author: ML Engineers Team
-Date: 2025-01-16
 
 Goal: Compare performance of:
 1. Standard preprocessed expression data (from step4)
@@ -498,11 +496,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
-# ok, so I just dont really understand which models were actually used for each modality for us to achieve the .68 AUC score
-# like for expression did we use XGboost, random forest or logositc, same for methylation
-# than for protein and mutation did we use xgboost, random forest, or gradient, etc
-# than expand on the feature selection methods we used, like I dont really understand what fold change, f statistic and fishers exact test are/do
-# than also explain to me the fusion methods, Im just confused on how we if we basically just weight each modality a certain weight, how the final AUC is greater than all individual that doesnt make sense to me
-# thats it, please answer my questions above thoroughly so I understand the code and the results and what we did, thank you
