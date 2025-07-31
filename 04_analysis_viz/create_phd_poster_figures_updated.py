@@ -850,15 +850,15 @@ def create_figure5_literature_comparison():
             'color': '#E74C3C'
         },
         'Pérez et al. 2025\n(Gene Expression Nomogram)': {
-            'auc': 0.75,
-            'auc_std': 0.04,  # Reported SD: 0.04
+            'auc': 0.629,
+            'auc_std': 0.115,  # Updated value
             'modalities': 2,  # Gene expression + clinical
             'sample_size': 191,  # 157 validation cohort
             'color': '#3498DB'
         },
         'Choi et al. 2021\n(Radiomics Model)': {
-            'auc': 0.75,
-            'auc_std': 0.075,  # Estimated from CI: 0.60-0.86
+            'auc': 0.750,
+            'auc_std': 0.15,  # Updated value
             'modalities': 1,  # CT radiomics + clinical
             'sample_size': 135,  # 87 train + 48 validation
             'color': '#2ECC71'
