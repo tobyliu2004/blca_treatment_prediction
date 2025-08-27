@@ -920,6 +920,220 @@ def save_roc_data_for_best_configs(modalities_data, y_train, sample_ids, class_w
     return roc_data
 
 
+def run_ablation_analysis(modalities_data, y_train, sample_ids, class_weights, best_configs):
+    """
+    Run comprehensive ablation analysis to measure each modality's contribution.
+    
+    Performs:
+    1. Leave-one-out analysis (remove each modality)
+    2. Pairwise analysis (all 2-modality combinations)
+    3. Single modality baselines
+    
+    Returns detailed contribution metrics for each modality.
+    """
+    print("\n" + "="*70)
+    print("ABLATION ANALYSIS - MODALITY CONTRIBUTIONS")
+    print("="*70)
+    
+    all_modalities = ['expression', 'protein', 'methylation', 'mutation']
+    ablation_results = {
+        'full_fusion': {},
+        'leave_one_out': {},
+        'pairwise': {},
+        'single_modality': {},
+        'contribution_summary': {}
+    }
+    
+    skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+    
+    # Helper function to run fusion with specified modalities
+    def run_fusion_with_modalities(modality_list, description):
+        """Run fusion using only specified modalities."""
+        print(f"\n{description}")
+        fold_aucs = []
+        
+        for fold_idx, (train_idx, val_idx) in enumerate(skf.split(modalities_data['expression'], y_train)):
+            y_train_fold = y_train[train_idx]
+            y_val_fold = y_train[val_idx]
+            
+            fold_predictions = {}
+            
+            # Get predictions from each specified modality
+            for modality in modality_list:
+                if modality not in best_configs:
+                    continue
+                    
+                X_data = modalities_data[modality]
+                X_train_fold = X_data.iloc[train_idx]
+                X_val_fold = X_data.iloc[val_idx]
+                
+                n_features = best_configs[modality]
+                
+                # Select features
+                features = select_features_advanced(
+                    X_train_fold, y_train_fold, modality, n_features
+                )
+                
+                if len(features) < 10:
+                    continue
+                
+                X_train_selected = X_train_fold[features]
+                X_val_selected = X_val_fold[features]
+                
+                # Get predictions
+                pred, model_name, auc, _ = train_diverse_models(
+                    X_train_selected, y_train_fold,
+                    X_val_selected, y_val_fold,
+                    class_weights, modality
+                )
+                
+                fold_predictions[modality] = pred
+            
+            # Apply fusion if we have multiple modalities
+            if len(fold_predictions) >= 2:
+                # Use ensemble fusion (best of methods)
+                fusion_pred, fusion_method = ensemble_fusion(fold_predictions, y_val_fold, 'all')
+                fold_auc = roc_auc_score(y_val_fold, fusion_pred)
+            elif len(fold_predictions) == 1:
+                # Single modality - no fusion needed
+                single_pred = list(fold_predictions.values())[0]
+                fold_auc = roc_auc_score(y_val_fold, single_pred)
+            else:
+                continue
+            
+            fold_aucs.append(fold_auc)
+        
+        if fold_aucs:
+            mean_auc = np.mean(fold_aucs)
+            std_auc = np.std(fold_aucs)
+            print(f"  Mean AUC: {mean_auc:.4f} ± {std_auc:.4f}")
+            return mean_auc, std_auc, fold_aucs
+        else:
+            return None, None, []
+    
+    # 1. BASELINE: Full fusion with all modalities
+    print("\n1. BASELINE - All 4 modalities:")
+    baseline_auc, baseline_std, baseline_folds = run_fusion_with_modalities(
+        all_modalities, 
+        "Running full fusion with all modalities"
+    )
+    ablation_results['full_fusion'] = {
+        'modalities': all_modalities,
+        'mean_auc': baseline_auc,
+        'std_auc': baseline_std,
+        'fold_aucs': baseline_folds
+    }
+    
+    # 2. LEAVE-ONE-OUT: Remove each modality one at a time
+    print("\n2. LEAVE-ONE-OUT ANALYSIS:")
+    for excluded_modality in all_modalities:
+        remaining_modalities = [m for m in all_modalities if m != excluded_modality]
+        
+        auc_without, std_without, folds_without = run_fusion_with_modalities(
+            remaining_modalities,
+            f"Excluding {excluded_modality} (using {', '.join(remaining_modalities)})"
+        )
+        
+        if auc_without is not None and baseline_auc is not None:
+            contribution = baseline_auc - auc_without
+            percent_drop = (contribution / baseline_auc) * 100
+            
+            ablation_results['leave_one_out'][excluded_modality] = {
+                'remaining_modalities': remaining_modalities,
+                'auc_without': auc_without,
+                'std_without': std_without,
+                'contribution': contribution,
+                'percent_drop': percent_drop,
+                'fold_aucs': folds_without
+            }
+            
+            print(f"  → Contribution of {excluded_modality}: {contribution:.4f} ({percent_drop:.2f}% drop)")
+    
+    # 3. PAIRWISE: All 2-modality combinations
+    print("\n3. PAIRWISE COMBINATIONS:")
+    from itertools import combinations
+    for mod1, mod2 in combinations(all_modalities, 2):
+        pair = [mod1, mod2]
+        pair_name = f"{mod1}+{mod2}"
+        
+        pair_auc, pair_std, pair_folds = run_fusion_with_modalities(
+            pair,
+            f"Testing pair: {pair_name}"
+        )
+        
+        if pair_auc is not None:
+            ablation_results['pairwise'][pair_name] = {
+                'modalities': pair,
+                'mean_auc': pair_auc,
+                'std_auc': pair_std,
+                'fold_aucs': pair_folds,
+                'improvement_over_best_single': None  # Will calculate after single modality
+            }
+    
+    # 4. SINGLE MODALITY: Individual performance
+    print("\n4. SINGLE MODALITY BASELINES:")
+    for modality in all_modalities:
+        single_auc, single_std, single_folds = run_fusion_with_modalities(
+            [modality],
+            f"Testing {modality} alone"
+        )
+        
+        if single_auc is not None:
+            ablation_results['single_modality'][modality] = {
+                'mean_auc': single_auc,
+                'std_auc': single_std,
+                'fold_aucs': single_folds
+            }
+    
+    # 5. CALCULATE SYNERGY METRICS
+    print("\n5. SYNERGY ANALYSIS:")
+    
+    # Calculate pairwise synergy (improvement over best single modality)
+    for pair_name, pair_data in ablation_results['pairwise'].items():
+        mod1, mod2 = pair_name.split('+')
+        if mod1 in ablation_results['single_modality'] and mod2 in ablation_results['single_modality']:
+            best_single = max(
+                ablation_results['single_modality'][mod1]['mean_auc'],
+                ablation_results['single_modality'][mod2]['mean_auc']
+            )
+            pair_data['improvement_over_best_single'] = pair_data['mean_auc'] - best_single
+            pair_data['synergy'] = pair_data['improvement_over_best_single'] > 0
+            
+            print(f"  {pair_name}: AUC={pair_data['mean_auc']:.4f}, "
+                  f"Synergy={'YES' if pair_data['synergy'] else 'NO'} "
+                  f"(+{pair_data['improvement_over_best_single']:.4f})")
+    
+    # 6. CONTRIBUTION SUMMARY
+    print("\n6. CONTRIBUTION SUMMARY:")
+    for modality in all_modalities:
+        summary = {
+            'single_auc': ablation_results['single_modality'].get(modality, {}).get('mean_auc', None),
+            'contribution_to_fusion': ablation_results['leave_one_out'].get(modality, {}).get('contribution', None),
+            'percent_contribution': ablation_results['leave_one_out'].get(modality, {}).get('percent_drop', None)
+        }
+        ablation_results['contribution_summary'][modality] = summary
+        
+        if summary['single_auc'] and summary['contribution_to_fusion']:
+            print(f"  {modality}:")
+            print(f"    Single AUC: {summary['single_auc']:.4f}")
+            print(f"    Contribution to fusion: {summary['contribution_to_fusion']:.4f} "
+                  f"({summary['percent_contribution']:.1f}%)")
+    
+    # Rank modalities by contribution
+    contributions = [
+        (mod, data['contribution_to_fusion']) 
+        for mod, data in ablation_results['contribution_summary'].items()
+        if data['contribution_to_fusion'] is not None
+    ]
+    contributions.sort(key=lambda x: x[1], reverse=True)
+    
+    print("\n7. MODALITY RANKING BY CONTRIBUTION:")
+    for rank, (modality, contribution) in enumerate(contributions, 1):
+        print(f"  {rank}. {modality}: {contribution:.4f}")
+    
+    return ablation_results
+
+
 def bootstrap_confidence_intervals(modalities_data, y_train, sample_ids, class_weights, 
                                   best_configs, n_bootstrap=200):
     """Fixed bootstrap implementation."""
@@ -1050,8 +1264,16 @@ def main():
     # Save fusion confusion matrix data
     fusion_confusion_data = save_fusion_confusion_matrices(all_fusion_results, y_train)
     
-    # Bootstrap CI on best configuration
+    # RUN ABLATION ANALYSIS with best configuration
+    print("\n" + "="*80)
+    print("RUNNING ABLATION ANALYSIS WITH BEST CONFIGURATION")
+    print("="*80)
     best_strategy_configs = best_result['configs']
+    ablation_results = run_ablation_analysis(
+        modalities_data, y_train, sample_ids, class_weights, best_strategy_configs
+    )
+    
+    # Bootstrap CI on best configuration
     mean_auc, ci_lower, ci_upper = bootstrap_confidence_intervals(
         modalities_data, y_train, sample_ids, class_weights, best_strategy_configs
     )
@@ -1073,6 +1295,8 @@ def main():
             elif np.isinf(obj):
                 return None  # Convert Inf to None for JSON compatibility
             return float(obj)
+        elif isinstance(obj, np.bool_):  # Handle numpy boolean
+            return bool(obj)
         elif isinstance(obj, float):
             # Handle Python float NaN and Inf
             if np.isnan(obj) or np.isinf(obj):
@@ -1088,6 +1312,7 @@ def main():
         'optimization_results': convert_numpy(optimization_results),
         'top_10_fusion_results': convert_numpy(all_fusion_results[:10]),
         'best_result': convert_numpy(best_result),
+        'ablation_analysis': convert_numpy(ablation_results),  # NEW: Comprehensive ablation results
         'bootstrap_ci': {
             'mean': float(mean_auc) if mean_auc else None,
             'lower_95': float(ci_lower) if ci_lower else None,
@@ -1101,8 +1326,72 @@ def main():
         'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     }
     
+    # Custom JSON formatting for better readability
+    def format_json_compact(obj, indent=0):
+        """Custom JSON formatter that keeps arrays compact when appropriate."""
+        spaces = '  ' * indent
+        
+        if isinstance(obj, dict):
+            if not obj:
+                return '{}'
+            
+            # For small dicts with simple values, keep on one line
+            if len(obj) <= 3 and all(not isinstance(v, (dict, list)) or 
+                                     (isinstance(v, list) and len(v) <= 5) 
+                                     for v in obj.values()):
+                items = [f'"{k}": {json.dumps(v)}' for k, v in obj.items()]
+                return '{' + ', '.join(items) + '}'
+            
+            # Otherwise format with indentation
+            lines = ['{']
+            items = list(obj.items())
+            for i, (key, value) in enumerate(items):
+                formatted_value = format_json_compact(value, indent + 1)
+                comma = ',' if i < len(items) - 1 else ''
+                lines.append(f'{spaces}  "{key}": {formatted_value}{comma}')
+            lines.append(spaces + '}')
+            return '\n'.join(lines)
+            
+        elif isinstance(obj, list):
+            if not obj:
+                return '[]'
+            
+            # Keep small numeric arrays on one line
+            if len(obj) <= 10 and all(isinstance(x, (int, float, type(None))) for x in obj):
+                return json.dumps(obj)
+            
+            # Keep arrays of small dicts somewhat compact
+            if all(isinstance(x, dict) for x in obj):
+                if all(len(d) <= 4 for d in obj):
+                    # Format each dict on fewer lines
+                    lines = ['[']
+                    for i, item in enumerate(obj):
+                        comma = ',' if i < len(obj) - 1 else ''
+                        item_str = format_json_compact(item, indent + 1)
+                        if '\n' in item_str:
+                            lines.append(f'{spaces}  {item_str}{comma}')
+                        else:
+                            lines.append(f'{spaces}  {item_str}{comma}')
+                    lines.append(spaces + ']')
+                    return '\n'.join(lines)
+            
+            # For complex arrays, use standard formatting
+            lines = ['[']
+            for i, item in enumerate(obj):
+                formatted_item = format_json_compact(item, indent + 1)
+                comma = ',' if i < len(obj) - 1 else ''
+                lines.append(f'{spaces}  {formatted_item}{comma}')
+            lines.append(spaces + ']')
+            return '\n'.join(lines)
+        
+        else:
+            return json.dumps(obj)
+    
+    # Write with custom formatting
+    # First convert all numpy types, then format
+    results_clean = convert_numpy(results)
     with open(f'{output_dir}/advanced_fusion_results.json', 'w') as f:
-        json.dump(results, f, indent=2)
+        f.write(format_json_compact(results_clean))
     
     # Comprehensive final summary
     print("\n" + "="*80)
